@@ -8,8 +8,6 @@ const musescoreBinPath = path.resolve(process.argv[2])
 const notebibliotekPath = path.resolve(process.argv[3])
 const globalOutPath = path.resolve(process.argv[4])
 
-// const files = fs.readdirSync(notebibliotekPath).filter(it => /\.mscz$/.test(it)).sort()
-
 // Doesn't do fancy recursive stuff, for now, we assume that the folder structure is relatively flat
 const dirs = fs.readdirSync(notebibliotekPath)
     .map(it => ({folder: it, fullPath:  path.resolve(notebibliotekPath, it)}))
@@ -18,18 +16,21 @@ const dirs = fs.readdirSync(notebibliotekPath)
 
 
 for (const {folder, fullPath} of dirs) {
-    console.log(folder)
     const outPath = path.resolve(globalOutPath, folder)
 
-
-    try { fs.rmSync(outPath, {recursive: true}) } catch (e) {}
-    fs.mkdirSync(outPath)
+    fs.mkdirSync(outPath, {recursive: true})
+    const filesToCleanUp = new Set(fs.readdirSync(outPath).map(it => path.resolve(outPath, it)))
 
     const files = fs.readdirSync(fullPath).filter(it => /\.mscz$/.test(it))
     for (const file of files) {
         const filePath = path.resolve(fullPath, file)
         const pdfPath = path.resolve(outPath, `${path.parse(file).name}.pdf`)
+        filesToCleanUp.delete(pdfPath)
 
         cp.spawnSync(musescoreBinPath, ["-o", pdfPath, filePath], {stdio: [process.stdin, process.stdout, process.stderr]})
+    }
+
+    for (const file of filesToCleanUp) {
+        fs.rmSync(file)
     }
 }
