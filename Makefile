@@ -1,7 +1,5 @@
 liturgi:
-	rm -rf out/
-	mkdir out
-	node liturgi-pdf.js ${MUSESCORE_BIN_PATH} ${HELLIGE_HALLVARD_NOTEBIBLIOTEK_PATH}/Liturgi out ${HELLIGE_HALLVARD_NOTEBIBLIOTEK_PATH}/PDF/Liturgi.pdf
+	node liturgi-pdf.js ${HELLIGE_HALLVARD_NOTEBIBLIOTEK_PATH}/PDF/Liturgi ${HELLIGE_HALLVARD_NOTEBIBLIOTEK_PATH}/PDF/Liturgi.pdf
 
 individuelle-pdf:
 	mkdir -p ${HELLIGE_HALLVARD_NOTEBIBLIOTEK_PATH}/PDF

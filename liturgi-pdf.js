@@ -4,22 +4,21 @@ const fs = require("fs")
 const path = require("path")
 const cp = require("child_process")
 
-const musescoreBinPath = path.resolve(process.argv[2])
-const liturgiPath = path.resolve(process.argv[3])
-const buildPath =  path.resolve(process.argv[4])
-const outPath =  path.resolve(process.argv[5])
+const liturgiPath = path.resolve(process.argv[2])
+const outPath =  path.resolve(process.argv[3])
 
-const files = fs.readdirSync(liturgiPath)
+const pdfs = fs.readdirSync(liturgiPath)
     // Vi skal bare ha med nummererte filer - liturgifilene er nummererte med 000, 010, osv, for å få rekkefølgen riktig i ferdig PDF
     .filter(it => /^\d+/.test(it))
+    .filter(it => /\.pdf$/.test(it))
     .sort()
+    .map(it => path.resolve(liturgiPath, it))
 
-for (const file of files) {
-    const [_, sortKey] = file.match(/^(\d+)/)
-    cp.spawnSync(musescoreBinPath, ["-o", `${buildPath}/${sortKey}.pdf`, `${liturgiPath}/${file}`], {stdio: [process.stdin, process.stdout, process.stderr]})
+const lastChangedPdf = Math.max(...pdfs.map(it => fs.statSync(it).mtime.getTime()))
+const liturgiPdfChange = fs.statSync(outPath).mtime.getTime()
+
+if (lastChangedPdf > liturgiPdfChange) {
+    cp.spawnSync("gs", ["-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite", `-sOutputFile=${outPath}`, ...pdfs], {stdio: [process.stdin, process.stdout, process.stderr]})
+} else {
+    console.log("Ingen PDF-er har endret seg, lager ikke ny liturgi-pdf")
 }
-
-
-// Vår gode venn GhostScript slurper inn alle PDF-ene og lager én nydelig PDF til oss
-const pdfs = fs.readdirSync(buildPath)
-cp.spawnSync("gs", ["-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite", `-sOutputFile=${outPath}`, ...(pdfs.map(it => `${buildPath}/${it}`))], {stdio: [process.stdin, process.stdout, process.stderr]})
