@@ -18,7 +18,6 @@ const dirs = fs.readdirSync(notebibliotekPath)
     .filter(it => fs.lstatSync(it.fullPath).isDirectory())
     .filter(it => it.fullPath !== globalOutPath)
 
-
 for (const {folder, fullPath} of dirs) {
     const outPath = path.resolve(globalOutPath, folder)
 
@@ -27,7 +26,7 @@ for (const {folder, fullPath} of dirs) {
     const filesToCleanUp = new Set(fs.readdirSync(outPath).map(it => path.resolve(outPath, it)))
 
     // Alle musescore-filer skal PDF-ifiseres
-    const files = fs.readdirSync(fullPath).filter(it => /\.mscz$/.test(it))
+    const files = fs.readdirSync(fullPath).filter(it => /\.msc(x|z)$/.test(it))
     for (const file of files) {
         const filePath = path.resolve(fullPath, file)
         // PDF-en skal hete det samme som musescore-fila
