@@ -22,17 +22,27 @@ const mariafestSharedPdfs = fs.readdirSync(mariafestSharedPdfsPath)
 
 const getMappedDirectories = (p) => 
     fs.readdirSync(p)
+        // Vi har her en liste med filnavn, men vi vil ha en liste med absolutte pather
         .map(folderName => path.resolve(p, folderName))
+        // Filer kan ta seg en bolle - vi skal lese musescore-filer ut fra mapper!
         .filter(folderPath => fs.lstatSync(folderPath).isDirectory())
         // globalOutPath kan (og er) en path inne i mappene vi driver og graver i, så sørg for at den hoppes over
         .filter(folderPath => folderPath !== globalOutPath)
         .map(folderPath => {
+            // Hvis vi er i /path/to/gdrive/foo/bar, får vi her foo/bar
             const relativeFolder = path.relative(notebibliotekPath, folderPath)
+            // Så ønsker vi å si at outpath er /the/global/out/path/foo/bar, sånn at PDF-ene ivaretar mappestrukturen til musescore-filene
             const outPath = path.resolve(globalOutPath, relativeFolder)
+
+            // Flagg via filsystemet ftw?
             const isMariafest = fs.existsSync(path.join(folderPath, ".mariafest"))
+
             return {
+                // Hele pathen til mappa med musescore-filer
                 folderPath: folderPath,
+                // Mappa vi skal dumpe PDF-er til
                 outPath: outPath,
+                // En liste med PDF-er som skal kopieres inn i outPath
                 copyPdfs: isMariafest ? mariafestSharedPdfs.map(it => ({source: it.filePath, dest: path.join(outPath, it.fileName)})) : [],
                 allFilesInOutPath: fs.readdirSync(outPath)
                     .map(it => path.resolve(outPath, it))
@@ -45,16 +55,18 @@ const getMappedDirectories = (p) =>
 
 const doIfMtimeChanged = (source, dest, f) => {
     if (!fs.existsSync(dest)) {
-        console.log(`*** Fil finnes ikke, lages (${path.relative(notebibliotekPath, source)}) `)
+        console.log(`*** Ut-fil finnes ikke (${path.relative(notebibliotekPath, source)}) `)
         f(source, dest)
     } else if (fs.statSync(source).mtime.getTime() > fs.statSync(dest).mtime.getTime()) {
-        console.log(`*** Fil har endringer, lages (${path.relative(notebibliotekPath, source)})`)
+        console.log(`*** Kildefil har endringer (${path.relative(notebibliotekPath, source)})`)
         f(source, dest)
     }
 }
 
-// Gjør ikke fancy rekursive greier. Enn så lenge kan vi leve med antagelsen om en mappestruktur med maks ett nivå nøsting
+// Vi har lyst på alle musescore-filene i mappa på toppnivå
 const dirs = getMappedDirectories(notebibliotekPath)
+    // I tillegg går vi ett hakk ned, og finner alle musescore-filer i mapper under det igjen. Det får holde enn så lenge,
+    // greit å slippe fancy rekursiv logikk her.
     .flatMap(it => [it].concat(getMappedDirectories(it.folderPath)))
 
 
@@ -69,20 +81,24 @@ dirs
     .forEach(it => filesToCleanUp.delete(it))
 
 
-
-for (const {outPath, allMusescoreFiles, copyPdfs} of dirs) {
-    fs.mkdirSync(outPath, {recursive: true})
-
-    for (const {musescoreFilePath, pdfPath} of allMusescoreFiles) {
-        doIfMtimeChanged(musescoreFilePath, pdfPath, writePdf)
+// Nå har vi samlet inn masse data, på tide å faktisk utføre destruktive operasjoner mot resten av verden
+const makeItSo = () => {
+    for (const {outPath, allMusescoreFiles, copyPdfs} of dirs) {
+        fs.mkdirSync(outPath, {recursive: true})
+    
+        for (const {musescoreFilePath, pdfPath} of allMusescoreFiles) {
+            doIfMtimeChanged(musescoreFilePath, pdfPath, writePdf)
+        }
+    
+        for (const {source, dest} of copyPdfs) {
+            doIfMtimeChanged(source, dest, fs.copyFileSync)
+        }
     }
-
-    for (const {source, dest} of copyPdfs) {
-        doIfMtimeChanged(source, dest, fs.copyFileSync)
+    
+    for (const file of filesToCleanUp) {
+        console.log(`*** Rydder opp løsgjenger-fil (${path.relative(notebibliotekPath, file)})`)
+        fs.rmSync(file)
     }
 }
 
-for (const file of filesToCleanUp) {
-    console.log(`*** Rydder opp løsgjenger-fil (${path.relative(notebibliotekPath, file)})`)
-    fs.rmSync(file)
-}
+makeItSo()
