@@ -22,9 +22,9 @@ const mariafestSharedPdfs = fs.readdirSync(mariafestSharedPdfsPath)
 
 const getMappedDirectories = (p) => 
     fs.readdirSync(p)
-        // Vi har her en liste med filnavn, men vi vil ha en liste med absolutte pather
+        // Vi har her en liste med navn på filer og mapper, men vi vil ha en liste med absolutte pather
         .map(folderName => path.resolve(p, folderName))
-        // Filer kan ta seg en bolle - vi skal lese musescore-filer ut fra mapper!
+        // Filer kan ta seg en bolle - vi skal finne mapper, og liste ut musescore-filer i dem
         .filter(folderPath => fs.lstatSync(folderPath).isDirectory())
         // globalOutPath kan (og er) en path inne i mappene vi driver og graver i, så sørg for at den hoppes over
         .filter(folderPath => folderPath !== globalOutPath)
