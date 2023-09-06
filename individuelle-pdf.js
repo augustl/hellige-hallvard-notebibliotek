@@ -12,18 +12,36 @@ const writePdf = (musescorePath, pdfPath) => {
     cp.spawnSync(musescoreBinPath, ["-o", pdfPath, musescorePath], {stdio: [process.stdin, process.stdout, process.stderr]})
 }
 
+const mariafestSharedPdfsPath = path.join(globalOutPath, "Datofester/Felles noter for Marias datofester")
+const mariafestSharedPdfs = fs.readdirSync(mariafestSharedPdfsPath)
+    .filter(it => /\.pdf$/.test(it))
+    .map(it => ({fileName: it, filePath: path.resolve(mariafestSharedPdfsPath, it)}))
+    // Det skal jo litt til at vi har en ting som slutter med ".pdf" og ikke er en fil, men la oss være på den sikre siden
+    .filter(it => fs.statSync(it.filePath).isFile())
+
 const getMappedDirectories = (p) => 
     fs.readdirSync(p)
-        .map(it => {
-            const fullPath = path.resolve(p, it)
-            const relativeFolder = path.relative(notebibliotekPath, fullPath)
+        .map(folderName => path.resolve(p, folderName))
+        .filter(folderPath => fs.lstatSync(folderPath).isDirectory())
+        // globalOutPath kan (og er) en path inne i mappene vi driver og graver i, så sørg for at den hoppes over
+        .filter(folderPath => folderPath !== globalOutPath)
+        .map(folderPath => {
+            const relativeFolder = path.relative(notebibliotekPath, folderPath)
+            const outPath = path.resolve(globalOutPath, relativeFolder)
+            const isMariafest = fs.existsSync(path.join(folderPath, ".mariafest"))
             return {
-                fullPath: fullPath,
-                outPath: path.resolve(globalOutPath, relativeFolder),
-                isMariafest: fs.existsSync(path.join(fullPath, ".mariafest"))
+                folderPath: folderPath,
+                isMariafest: isMariafest,
+                outPath: outPath,
+                copyPdfs: isMariafest ? mariafestSharedPdfs.map(it => ({source: it.filePath, dest: path.join(outPath, it.fileName)})) : [],
+                allFilesInOutPath: fs.readdirSync(outPath)
+                    .map(it => path.resolve(outPath, it))
+                    .filter(it => fs.lstatSync(it).isFile()),
+                allMusescoreFiles: fs.readdirSync(folderPath)
+                    .filter(it => /\.msc(x|z)$/.test(it))
+                    .map(it => ({filePath: path.resolve(folderPath, it), pdfPath: path.resolve(outPath, `${path.parse(it).name}.pdf`)}))
             }
         })
-        .filter(it => fs.lstatSync(it.fullPath).isDirectory())
 
 const doIfMtimeChanged = (source, dest, f) => {
     if (!fs.existsSync(dest)) {
@@ -35,54 +53,40 @@ const doIfMtimeChanged = (source, dest, f) => {
     }
 }
 
-const filesToCleanUp = new Set()
+
+// const filesToCleanUp = new Set()
 
 // Gjør ikke fancy rekursive greier. Enn så lenge kan vi leve med antagelsen om en mappestruktur med maks ett nivå nøsting
 const dirs = getMappedDirectories(notebibliotekPath)
-    .filter(it => it.fullPath !== globalOutPath)
-    .flatMap(it => [it].concat(getMappedDirectories(it.fullPath)))
+    .flatMap(it => [it].concat(getMappedDirectories(it.folderPath)))
 
-for (const {fullPath, outPath} of dirs) {
+
+// Vi lister opp _alle_ filer i output-mappene for potensiell cleanup
+const filesToCleanUp = new Set(dirs.flatMap(it => it.allFilesInOutPath))
+dirs
+    .flatMap(it => 
+        // Men alle PDF-filer som generees fra musescore skal beholdes
+        it.allMusescoreFiles.flatMap(it => it.pdfPath)
+        // Og det skal alle ferdig genererte PDF-er som kopieres og
+        .concat(it.copyPdfs.map(it => it.dest)))
+    .forEach(it => filesToCleanUp.delete(it))
+
+
+
+for (const {outPath, allMusescoreFiles, copyPdfs} of dirs) {
     fs.mkdirSync(outPath, {recursive: true})
 
-    // Alle filer i out-mappa er kandidater for å ryddes opp etterpå
-    fs.readdirSync(outPath).map(it => path.resolve(outPath, it)).filter(it => fs.lstatSync(it).isFile()).forEach(it => filesToCleanUp.add(it))
-
-    // Alle musescore-filer skal PDF-ifiseres
-    const files = fs.readdirSync(fullPath).filter(it => /\.msc(x|z)$/.test(it))
-    for (const file of files) {
-        const filePath = path.resolve(fullPath, file)
-        // PDF-en skal hete det samme som musescore-fila
-        const pdfPath = path.resolve(outPath, `${path.parse(file).name}.pdf`)
-
-        // PDF-er vi faktisk lager nå skal ikke ryddes opp etterpå
-        filesToCleanUp.delete(pdfPath)
-
+    for (const {filePath, pdfPath} of allMusescoreFiles) {
         doIfMtimeChanged(filePath, pdfPath, writePdf)
     }
-}
 
-const mariafestSharedPdfsPath = path.join(globalOutPath, "Datofester/Felles noter for Marias datofester")
-const mariafestSharedPdfs = fs.readdirSync(mariafestSharedPdfsPath)
-    .filter(it => /\.pdf$/.test(it))
-    .map(it => ({path: it, fullPath: path.resolve(mariafestSharedPdfsPath, it)}))
-    .filter(it => fs.statSync(it.fullPath).isFile())
-
-for (const {outPath, isMariafest} of dirs) {
-    if (!isMariafest) {
-        continue
-    }
-
-    for (const pdf of mariafestSharedPdfs) {
-        const pdfCopyDest = path.join(outPath, pdf.path)
-        filesToCleanUp.delete(pdfCopyDest)
-        doIfMtimeChanged(pdf.fullPath, pdfCopyDest, fs.copyFileSync)
+    for (const {source, dest} of copyPdfs) {
+        doIfMtimeChanged(source, dest, fs.copyFileSync)
     }
 }
-
 
 // Fjern alle løsgjenger-filer som eventuelt ligger og slenger i mappa
 for (const file of filesToCleanUp) {
-    console.log(`*** PDF finnes men ikke Musesecore-fil, sletter PDF (${path.relative(notebibliotekPath, file)})`)
+    console.log(`*** Rydder opp løsgjenger-fil (${path.relative(notebibliotekPath, file)})`)
     fs.rmSync(file)
 }
