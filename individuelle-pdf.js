@@ -8,8 +8,8 @@ const musescoreBinPath = path.resolve(process.argv[2])
 const notebibliotekPath = path.resolve(process.argv[3])
 const globalOutPath = path.resolve(process.argv[4])
 
-const writePdf = (pdfPath, filePath) => {
-    cp.spawnSync(musescoreBinPath, ["-o", pdfPath, filePath], {stdio: [process.stdin, process.stdout, process.stderr]})
+const writePdf = (musescorePath, pdfPath) => {
+    cp.spawnSync(musescoreBinPath, ["-o", pdfPath, musescorePath], {stdio: [process.stdin, process.stdout, process.stderr]})
 }
 
 const getMappedDirectories = (p) => 
@@ -24,6 +24,16 @@ const getMappedDirectories = (p) =>
             }
         })
         .filter(it => fs.lstatSync(it.fullPath).isDirectory())
+
+const doIfMtimeChanged = (source, dest, f) => {
+    if (!fs.existsSync(dest)) {
+        console.log(`*** Fil finnes ikke, lages (${source}) `)
+        f(source, dest)
+    } else if (fs.statSync(source).mtime.getTime() > fs.statSync(dest).mtime.getTime()) {
+        console.log(`*** Fil har endringer, lages (${source})`)
+        f(source, dest)
+    }
+}
 
 const filesToCleanUp = new Set()
 
@@ -48,13 +58,7 @@ for (const {fullPath, outPath} of dirs) {
         // PDF-er vi faktisk lager nå skal ikke ryddes opp etterpå
         filesToCleanUp.delete(pdfPath)
 
-        if (!fs.existsSync(pdfPath)) {
-            console.log(`*** PDF finnes ikke, lager (${file}) `)
-            writePdf(pdfPath, filePath)
-        } else if (fs.statSync(filePath).mtime.getTime() > fs.statSync(pdfPath).mtime.getTime()) {
-            console.log(`*** Musescore-fil har endringer, lager ny PDF (${file})`)
-            writePdf(pdfPath, filePath)
-        }
+        doIfMtimeChanged(filePath, pdfPath, writePdf)
     }
 }
 
@@ -72,7 +76,7 @@ for (const {outPath, isMariafest} of dirs) {
     for (const pdf of mariafestSharedPdfs) {
         const pdfCopyDest = path.join(outPath, pdf.path)
         filesToCleanUp.delete(pdfCopyDest)
-        fs.copyFileSync(pdf.fullPath, pdfCopyDest)
+        doIfMtimeChanged(pdf.fullPath, pdfCopyDest, fs.copyFileSync)
     }
 }
 
