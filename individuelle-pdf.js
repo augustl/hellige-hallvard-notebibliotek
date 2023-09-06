@@ -12,15 +12,24 @@ const writePdf = (pdfPath, filePath) => {
     cp.spawnSync(musescoreBinPath, ["-o", pdfPath, filePath], {stdio: [process.stdin, process.stdout, process.stderr]})
 }
 
-// Gjør ikke fancy rekursive greier. Enn så lenge kan vi leve med antagelsen om en nokså flat mappestruktur
-const dirs = fs.readdirSync(notebibliotekPath)
-    .map(it => ({folder: it, fullPath:  path.resolve(notebibliotekPath, it)}))
-    .filter(it => fs.lstatSync(it.fullPath).isDirectory())
+const getMappedDirectories = (p) => 
+    fs.readdirSync(p)
+        .map(it => {
+            const fullPath = path.resolve(p, it)
+            const relativeFolder = path.relative(notebibliotekPath, fullPath)
+            return {
+                fullPath: fullPath,
+                outPath: path.resolve(globalOutPath, relativeFolder)
+            }
+        })
+        .filter(it => fs.lstatSync(it.fullPath).isDirectory())
+
+// Gjør ikke fancy rekursive greier. Enn så lenge kan vi leve med antagelsen om en mappestruktur med maks ett nivå nøsting
+const dirs = getMappedDirectories(notebibliotekPath)
     .filter(it => it.fullPath !== globalOutPath)
+    .flatMap(it => [it].concat(getMappedDirectories(it.fullPath)))
 
-for (const {folder, fullPath} of dirs) {
-    const outPath = path.resolve(globalOutPath, folder)
-
+for (const {fullPath, outPath} of dirs) {
     fs.mkdirSync(outPath, {recursive: true})
     // Alle filer i out-mappa er kandidater for å ryddes opp etterpå
     const filesToCleanUp = new Set(fs.readdirSync(outPath).map(it => path.resolve(outPath, it)))
