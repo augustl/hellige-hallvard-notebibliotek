@@ -12,6 +12,7 @@ const writePdf = (musescorePath, pdfPath) => {
     cp.spawnSync(musescoreBinPath, ["-o", pdfPath, musescorePath], {stdio: [process.stdin, process.stdout, process.stderr]})
 }
 
+// En samling med PDF-er som skal kopieres inn i out-mappa i visse situasjoner
 const mariafestSharedPdfsPath = path.join(globalOutPath, "Datofester/Felles noter for Marias datofester")
 const mariafestSharedPdfs = fs.readdirSync(mariafestSharedPdfsPath)
     .filter(it => /\.pdf$/.test(it))
@@ -31,7 +32,6 @@ const getMappedDirectories = (p) =>
             const isMariafest = fs.existsSync(path.join(folderPath, ".mariafest"))
             return {
                 folderPath: folderPath,
-                isMariafest: isMariafest,
                 outPath: outPath,
                 copyPdfs: isMariafest ? mariafestSharedPdfs.map(it => ({source: it.filePath, dest: path.join(outPath, it.fileName)})) : [],
                 allFilesInOutPath: fs.readdirSync(outPath)
@@ -39,7 +39,7 @@ const getMappedDirectories = (p) =>
                     .filter(it => fs.lstatSync(it).isFile()),
                 allMusescoreFiles: fs.readdirSync(folderPath)
                     .filter(it => /\.msc(x|z)$/.test(it))
-                    .map(it => ({filePath: path.resolve(folderPath, it), pdfPath: path.resolve(outPath, `${path.parse(it).name}.pdf`)}))
+                    .map(it => ({musescoreFilePath: path.resolve(folderPath, it), pdfPath: path.resolve(outPath, `${path.parse(it).name}.pdf`)}))
             }
         })
 
@@ -52,9 +52,6 @@ const doIfMtimeChanged = (source, dest, f) => {
         f(source, dest)
     }
 }
-
-
-// const filesToCleanUp = new Set()
 
 // Gjør ikke fancy rekursive greier. Enn så lenge kan vi leve med antagelsen om en mappestruktur med maks ett nivå nøsting
 const dirs = getMappedDirectories(notebibliotekPath)
@@ -76,8 +73,8 @@ dirs
 for (const {outPath, allMusescoreFiles, copyPdfs} of dirs) {
     fs.mkdirSync(outPath, {recursive: true})
 
-    for (const {filePath, pdfPath} of allMusescoreFiles) {
-        doIfMtimeChanged(filePath, pdfPath, writePdf)
+    for (const {musescoreFilePath, pdfPath} of allMusescoreFiles) {
+        doIfMtimeChanged(musescoreFilePath, pdfPath, writePdf)
     }
 
     for (const {source, dest} of copyPdfs) {
@@ -85,7 +82,6 @@ for (const {outPath, allMusescoreFiles, copyPdfs} of dirs) {
     }
 }
 
-// Fjern alle løsgjenger-filer som eventuelt ligger og slenger i mappa
 for (const file of filesToCleanUp) {
     console.log(`*** Rydder opp løsgjenger-fil (${path.relative(notebibliotekPath, file)})`)
     fs.rmSync(file)
