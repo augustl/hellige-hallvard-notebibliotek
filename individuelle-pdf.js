@@ -25,6 +25,8 @@ const getMappedDirectories = (p) =>
         })
         .filter(it => fs.lstatSync(it.fullPath).isDirectory())
 
+const filesToCleanUp = new Set()
+
 // Gjør ikke fancy rekursive greier. Enn så lenge kan vi leve med antagelsen om en mappestruktur med maks ett nivå nøsting
 const dirs = getMappedDirectories(notebibliotekPath)
     .filter(it => it.fullPath !== globalOutPath)
@@ -32,8 +34,9 @@ const dirs = getMappedDirectories(notebibliotekPath)
 
 for (const {fullPath, outPath} of dirs) {
     fs.mkdirSync(outPath, {recursive: true})
+
     // Alle filer i out-mappa er kandidater for å ryddes opp etterpå
-    const filesToCleanUp = new Set(fs.readdirSync(outPath).map(it => path.resolve(outPath, it)).filter(it => fs.lstatSync(it).isFile()))
+    fs.readdirSync(outPath).map(it => path.resolve(outPath, it)).filter(it => fs.lstatSync(it).isFile()).forEach(it => filesToCleanUp.add(it))
 
     // Alle musescore-filer skal PDF-ifiseres
     const files = fs.readdirSync(fullPath).filter(it => /\.msc(x|z)$/.test(it))
@@ -53,12 +56,6 @@ for (const {fullPath, outPath} of dirs) {
             writePdf(pdfPath, filePath)
         }
     }
-
-    // Fjern alle løsgjenger-filer som eventuelt ligger og slenger i mappa
-    for (const file of filesToCleanUp) {
-        console.log(`*** PDF finnes men ikke Musesecore-fil, sletter PDF (${file})`)
-        fs.rmSync(file)
-    }
 }
 
 const mariafestSharedPdfsPath = path.join(globalOutPath, "Høytidsdager/Felles noter for Marias høytidsdager")
@@ -73,6 +70,15 @@ for (const {outPath, isMariafest} of dirs) {
     }
 
     for (const pdf of mariafestSharedPdfs) {
-        fs.copyFileSync(pdf.fullPath, path.join(outPath, pdf.path))
+        const pdfCopyDest = path.join(outPath, pdf.path)
+        filesToCleanUp.delete(pdfCopyDest)
+        fs.copyFileSync(pdf.fullPath, pdfCopyDest)
     }
+}
+
+
+// Fjern alle løsgjenger-filer som eventuelt ligger og slenger i mappa
+for (const file of filesToCleanUp) {
+    console.log(`*** PDF finnes men ikke Musesecore-fil, sletter PDF (${file})`)
+    fs.rmSync(file)
 }
