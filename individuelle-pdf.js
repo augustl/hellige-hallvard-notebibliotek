@@ -19,7 +19,8 @@ const getMappedDirectories = (p) =>
             const relativeFolder = path.relative(notebibliotekPath, fullPath)
             return {
                 fullPath: fullPath,
-                outPath: path.resolve(globalOutPath, relativeFolder)
+                outPath: path.resolve(globalOutPath, relativeFolder),
+                isMariafest: fs.existsSync(path.join(fullPath, ".mariafest"))
             }
         })
         .filter(it => fs.lstatSync(it.fullPath).isDirectory())
@@ -32,7 +33,7 @@ const dirs = getMappedDirectories(notebibliotekPath)
 for (const {fullPath, outPath} of dirs) {
     fs.mkdirSync(outPath, {recursive: true})
     // Alle filer i out-mappa er kandidater for å ryddes opp etterpå
-    const filesToCleanUp = new Set(fs.readdirSync(outPath).map(it => path.resolve(outPath, it)))
+    const filesToCleanUp = new Set(fs.readdirSync(outPath).map(it => path.resolve(outPath, it)).filter(it => fs.lstatSync(it).isFile()))
 
     // Alle musescore-filer skal PDF-ifiseres
     const files = fs.readdirSync(fullPath).filter(it => /\.msc(x|z)$/.test(it))
@@ -57,5 +58,21 @@ for (const {fullPath, outPath} of dirs) {
     for (const file of filesToCleanUp) {
         console.log(`*** PDF finnes men ikke Musesecore-fil, sletter PDF (${file})`)
         fs.rmSync(file)
+    }
+}
+
+const mariafestSharedPdfsPath = path.join(globalOutPath, "Høytidsdager/Felles noter for Marias høytidsdager")
+const mariafestSharedPdfs = fs.readdirSync(mariafestSharedPdfsPath)
+    .filter(it => /\.pdf$/.test(it))
+    .map(it => ({path: it, fullPath: path.resolve(mariafestSharedPdfsPath, it)}))
+    .filter(it => fs.statSync(it.fullPath).isFile())
+
+for (const {outPath, isMariafest} of dirs) {
+    if (!isMariafest) {
+        continue
+    }
+
+    for (const pdf of mariafestSharedPdfs) {
+        fs.copyFileSync(pdf.fullPath, path.join(outPath, pdf.path))
     }
 }
