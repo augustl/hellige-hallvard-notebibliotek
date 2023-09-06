@@ -27,10 +27,10 @@ const getMappedDirectories = (p) =>
 
 const doIfMtimeChanged = (source, dest, f) => {
     if (!fs.existsSync(dest)) {
-        console.log(`*** Fil finnes ikke, lages (${source}) `)
+        console.log(`*** Fil finnes ikke, lages (${path.relative(notebibliotekPath, source)}) `)
         f(source, dest)
     } else if (fs.statSync(source).mtime.getTime() > fs.statSync(dest).mtime.getTime()) {
-        console.log(`*** Fil har endringer, lages (${source})`)
+        console.log(`*** Fil har endringer, lages (${path.relative(notebibliotekPath, source)})`)
         f(source, dest)
     }
 }
@@ -83,6 +83,6 @@ for (const {outPath, isMariafest} of dirs) {
 
 // Fjern alle løsgjenger-filer som eventuelt ligger og slenger i mappa
 for (const file of filesToCleanUp) {
-    console.log(`*** PDF finnes men ikke Musesecore-fil, sletter PDF (${file})`)
+    console.log(`*** PDF finnes men ikke Musesecore-fil, sletter PDF (${path.relative(notebibliotekPath, file)})`)
     fs.rmSync(file)
 }
