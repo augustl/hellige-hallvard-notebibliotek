@@ -62,7 +62,7 @@ for (const {fullPath, outPath} of dirs) {
     }
 }
 
-const mariafestSharedPdfsPath = path.join(globalOutPath, "Høytidsdager/Felles noter for Marias høytidsdager")
+const mariafestSharedPdfsPath = path.join(globalOutPath, "Datofester/Felles noter for Marias datofester")
 const mariafestSharedPdfs = fs.readdirSync(mariafestSharedPdfsPath)
     .filter(it => /\.pdf$/.test(it))
     .map(it => ({path: it, fullPath: path.resolve(mariafestSharedPdfsPath, it)}))
