@@ -12,18 +12,18 @@ const writePdf = (musescorePath, pdfPath) => {
     cp.spawnSync(musescoreBinPath, ["-o", pdfPath, musescorePath], {stdio: [process.stdin, process.stdout, process.stderr]})
 }
 
+// Lister mappeinnhold med absolutte pather, i stedet for bare filnavn/mappenavn
+const readdirSyncAbsolute = (p) => fs.readdirSync(p).map(it => path.resolve(p, it)) 
+
 // En samling med PDF-er som skal kopieres inn i out-mappa i visse situasjoner
 const mariafestSharedPdfsPath = path.join(globalOutPath, "Datofester/Felles noter for Marias datofester")
-const mariafestSharedPdfs = fs.readdirSync(mariafestSharedPdfsPath)
+const mariafestSharedPdfs = readdirSyncAbsolute(mariafestSharedPdfsPath)
     .filter(it => /\.pdf$/.test(it))
-    .map(it => ({fileName: it, filePath: path.resolve(mariafestSharedPdfsPath, it)}))
     // Det skal jo litt til at vi har en ting som slutter med ".pdf" og ikke er en fil, men la oss være på den sikre siden
-    .filter(it => fs.statSync(it.filePath).isFile())
+    .filter(it => fs.statSync(it).isFile())
 
 const getMappedDirectories = (p) => 
-    fs.readdirSync(p)
-        // Vi har her en liste med navn på filer og mapper, men vi vil ha en liste med absolutte pather
-        .map(folderName => path.resolve(p, folderName))
+    readdirSyncAbsolute(p)
         // Filer kan ta seg en bolle - vi skal finne mapper, og liste ut musescore-filer i dem
         .filter(folderPath => fs.lstatSync(folderPath).isDirectory())
         // globalOutPath kan (og er) en path inne i mappene vi driver og graver i, så sørg for at den hoppes over
@@ -43,10 +43,10 @@ const getMappedDirectories = (p) =>
                 // Mappa vi skal dumpe PDF-er til
                 outPath: outPath,
                 // En liste med PDF-er som skal kopieres inn i outPath
-                copyPdfs: isMariafest ? mariafestSharedPdfs.map(it => ({source: it.filePath, dest: path.join(outPath, it.fileName)})) : [],
-                allMusescoreFiles: fs.readdirSync(folderPath)
+                copyPdfs: isMariafest ? mariafestSharedPdfs.map(it => ({source: it, dest: path.join(outPath, `${path.parse(it).name}${path.parse(it).ext}`)})) : [],
+                allMusescoreFiles: readdirSyncAbsolute(folderPath)
                     .filter(it => /\.msc(x|z)$/.test(it))
-                    .map(it => ({musescoreFilePath: path.resolve(folderPath, it), pdfPath: path.resolve(outPath, `${path.parse(it).name}.pdf`)}))
+                    .map(it => ({musescoreFilePath: it, pdfPath: path.resolve(outPath, `${path.parse(it).name}.pdf`)}))
             }
         })
 
@@ -68,10 +68,7 @@ const dirs = getMappedDirectories(notebibliotekPath)
 
 
 // Vi lister opp _alle_ filer i output-mappene for potensiell cleanup
-const filesToCleanUp = new Set(dirs.flatMap(dir => 
-    fs.readdirSync(dir.outPath)
-        .map(it => path.resolve(dir.outPath, it))
-        .filter(it => fs.lstatSync(it).isFile())))
+const filesToCleanUp = new Set(dirs.flatMap(dir => readdirSyncAbsolute(dir.outPath).filter(it => fs.lstatSync(it).isFile())))
 
 dirs
     .flatMap(it => 
