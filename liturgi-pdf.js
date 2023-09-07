@@ -15,9 +15,9 @@ const pdfs = fs.readdirSync(liturgiPath)
     .map(it => path.resolve(liturgiPath, it))
 
 const lastChangedPdf = Math.max(...pdfs.map(it => fs.statSync(it).mtime.getTime()))
-const liturgiPdfChange = fs.statSync(outPath).mtime.getTime()
+const liturgiPdfChange = fs.statSync(outPath, {throwIfNoEntry: false})?.mtime?.getTime()
 
-if (lastChangedPdf > liturgiPdfChange) {
+if (!liturgiPdfChange || (lastChangedPdf > liturgiPdfChange)) {
     cp.spawnSync("gs", ["-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite", `-sOutputFile=${outPath}`, ...pdfs], {stdio: [process.stdin, process.stdout, process.stderr]})
 } else {
     console.log("Ingen PDF-er har endret seg, lager ikke ny liturgi-pdf")
