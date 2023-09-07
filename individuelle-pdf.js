@@ -44,9 +44,6 @@ const getMappedDirectories = (p) =>
                 outPath: outPath,
                 // En liste med PDF-er som skal kopieres inn i outPath
                 copyPdfs: isMariafest ? mariafestSharedPdfs.map(it => ({source: it.filePath, dest: path.join(outPath, it.fileName)})) : [],
-                allFilesInOutPath: fs.readdirSync(outPath)
-                    .map(it => path.resolve(outPath, it))
-                    .filter(it => fs.lstatSync(it).isFile()),
                 allMusescoreFiles: fs.readdirSync(folderPath)
                     .filter(it => /\.msc(x|z)$/.test(it))
                     .map(it => ({musescoreFilePath: path.resolve(folderPath, it), pdfPath: path.resolve(outPath, `${path.parse(it).name}.pdf`)}))
@@ -71,7 +68,11 @@ const dirs = getMappedDirectories(notebibliotekPath)
 
 
 // Vi lister opp _alle_ filer i output-mappene for potensiell cleanup
-const filesToCleanUp = new Set(dirs.flatMap(it => it.allFilesInOutPath))
+const filesToCleanUp = new Set(dirs.flatMap(dir => 
+    fs.readdirSync(dir.outPath)
+        .map(it => path.resolve(dir.outPath, it))
+        .filter(it => fs.lstatSync(it).isFile())))
+
 dirs
     .flatMap(it => 
         // Men alle PDF-filer som generees fra musescore skal beholdes
