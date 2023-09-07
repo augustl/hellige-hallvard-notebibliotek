@@ -1,0 +1,8 @@
+{
+    "name": "hellige-hallvard-notebibliotek",
+    "private": true,
+    "dependencies": {
+        "@xmldom/xmldom": "^0.8.10",
+        "jszip": "3.10.1"
+    }
+}

@@ -3,6 +3,8 @@
 const fs = require("fs")
 const path = require("path")
 const cp = require("child_process")
+const utils = require("./utils")
+const {readdirSyncAbsolute, MUSESCORE_FILE_REGEX} = utils
 
 const musescoreBinPath = path.resolve(process.argv[2])
 const notebibliotekPath = path.resolve(process.argv[3])
@@ -11,9 +13,6 @@ const globalOutPath = path.resolve(process.argv[4])
 const writePdf = (musescorePath, pdfPath) => {
     cp.spawnSync(musescoreBinPath, ["-o", pdfPath, musescorePath], {stdio: [process.stdin, process.stdout, process.stderr]})
 }
-
-// Lister mappeinnhold med absolutte pather, i stedet for bare filnavn/mappenavn
-const readdirSyncAbsolute = (p) => fs.readdirSync(p).map(it => path.resolve(p, it)) 
 
 // En samling med PDF-er som skal kopieres inn i out-mappa i visse situasjoner
 const mariafestSharedPdfsPath = path.join(globalOutPath, "Datofester/Felles noter for Marias datofester")
@@ -45,7 +44,7 @@ const getMappedDirectories = (p) =>
                 // En liste med PDF-er som skal kopieres inn i outPath
                 copyPdfs: isMariafest ? mariafestSharedPdfs.map(it => ({source: it, dest: path.join(outPath, `${path.parse(it).name}${path.parse(it).ext}`)})) : [],
                 allMusescoreFiles: readdirSyncAbsolute(folderPath)
-                    .filter(it => /\.msc(x|z)$/.test(it))
+                    .filter(it => MUSESCORE_FILE_REGEX.test(it))
                     .map(it => ({musescoreFilePath: it, pdfPath: path.resolve(outPath, `${path.parse(it).name}.pdf`)}))
             }
         })
