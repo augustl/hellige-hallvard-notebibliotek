@@ -14,13 +14,6 @@ const writePdf = (musescorePath, pdfPath) => {
     cp.spawnSync(musescoreBinPath, ["-o", pdfPath, musescorePath], {stdio: [process.stdin, process.stdout, process.stderr]})
 }
 
-// En samling med PDF-er som skal kopieres inn i out-mappa i visse situasjoner
-const mariafestSharedPdfsPath = path.join(globalOutPath, "Datofester/Felles noter for Marias datofester")
-const mariafestSharedPdfs = readdirSyncAbsolute(mariafestSharedPdfsPath)
-    .filter(it => /\.pdf$/.test(it))
-    // Det skal jo litt til at vi har en ting som slutter med ".pdf" og ikke er en fil, men la oss være på den sikre siden
-    .filter(it => fs.statSync(it).isFile())
-
 const getMappedDirectories = (p) => 
     readdirSyncAbsolute(p)
         // Filer kan ta seg en bolle - vi skal finne mapper, og liste ut musescore-filer i dem
@@ -33,16 +26,12 @@ const getMappedDirectories = (p) =>
             // Så ønsker vi å si at outpath er /the/global/out/path/foo/bar, sånn at PDF-ene ivaretar mappestrukturen til musescore-filene
             const outPath = path.resolve(globalOutPath, relativeFolder)
 
-            // Flagg via filsystemet ftw?
-            const isMariafest = fs.existsSync(path.join(folderPath, ".mariafest"))
 
             return {
                 // Hele pathen til mappa med musescore-filer
                 folderPath: folderPath,
                 // Mappa vi skal dumpe PDF-er til
                 outPath: outPath,
-                // En liste med PDF-er som skal kopieres inn i outPath
-                copyPdfs: isMariafest ? mariafestSharedPdfs.map(it => ({source: it, dest: path.join(outPath, `${path.parse(it).name}${path.parse(it).ext}`)})) : [],
                 allMusescoreFiles: readdirSyncAbsolute(folderPath)
                     .filter(it => MUSESCORE_FILE_REGEX.test(it))
                     .map(it => ({musescoreFilePath: it, pdfPath: path.resolve(outPath, `${path.parse(it).name}.pdf`)}))
@@ -72,24 +61,19 @@ const filesToCleanUp = new Set(dirs.flatMap(dir => readdirSyncAbsolute(dir.outPa
 dirs
     .flatMap(it => 
         // Men alle PDF-filer som generees fra musescore skal beholdes
-        it.allMusescoreFiles.flatMap(it => it.pdfPath)
-        // Og det skal alle ferdig genererte PDF-er som kopieres og
-        .concat(it.copyPdfs.map(it => it.dest)))
+        it.allMusescoreFiles.flatMap(it => it.pdfPath))
     .forEach(it => filesToCleanUp.delete(it))
 
 
 // Nå har vi samlet inn masse data, på tide å faktisk utføre destruktive operasjoner mot resten av verden
 const makeItSo = () => {
-    for (const {outPath, allMusescoreFiles, copyPdfs} of dirs) {
+    for (const {outPath, allMusescoreFiles} of dirs) {
         fs.mkdirSync(outPath, {recursive: true})
     
         for (const {musescoreFilePath, pdfPath} of allMusescoreFiles) {
             doIfMtimeChanged(musescoreFilePath, pdfPath, writePdf)
         }
-    
-        for (const {source, dest} of copyPdfs) {
-            doIfMtimeChanged(source, dest, fs.copyFileSync)
-        }
+
     }
     
     for (const file of filesToCleanUp) {
